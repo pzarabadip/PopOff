@@ -8,7 +8,7 @@ class LammpsData():
     """
     Class that collates all structural information for outputing a Lammps format.
     """
-    def __init__(self, atom_types, bond_types, atoms, bonds, cell_lengths, tilt_factors, file_name, expected_stress_tensors):
+    def __init__(self, atom_types, bond_types, atoms, bonds, cell_lengths, tilt_factors, file_name, expected_stress_tensors, cutoff):
         """
         Initialise an instance for all information relating to the pysical and electronic structure needed for the Lammps input.
 
@@ -34,6 +34,7 @@ class LammpsData():
         self.file_name = file_name
         self.write_lammps_files()
         self.expected_stress_tensors = expected_stress_tensors
+        self.cutoff = cutoff
         
     @classmethod
     def from_structure(cls, structure, params, i, stresses):
@@ -67,7 +68,10 @@ class LammpsData():
         file_name = 'lammps/coords{}.lmp'.format(i+1)
         expected_stress_tensors = stresses
 
-        return cls( atom_types, bond_types, atoms, bonds, cell_lengths, tilt_factors, file_name, expected_stress_tensors)
+        if 'cutoff' in params.keys():
+            cutoff = params['cutoff']
+
+        return cls( atom_types, bond_types, atoms, bonds, cell_lengths, tilt_factors, file_name, expected_stress_tensors, cutoff)
     
     def _header_string( self, title='title' ):
         """
@@ -276,15 +280,17 @@ class LammpsData():
             lmp.command('group shells type {}'.format(self.type_shell()))
 
         if cs_springs:
-            lmp.command('pair_style buck/coul/long/cs 10.0')
+            lmp.command(f'pair_style buck/coul/long/cs {self.cutoff}')
             lmp.command('pair_coeff * * 0 1 0')
 
             lmp.command('bond_style harmonic')   
             for bond in self.bond_types:
                 lmp.command(bond.bond_string())
         else:
-            lmp.command('pair_style buck/coul/long 10.0')
+            lmp.command(f'pair_style buck/coul/long {self.cutoff}')
             lmp.command('pair_coeff * * 0 1 0')
+        
+        # print(f'pair_style buck/coul/long/cs {self.cutoff}')
 
         lmp.command('kspace_style ewald 1e-6')
 
